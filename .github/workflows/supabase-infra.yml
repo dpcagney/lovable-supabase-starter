@@ -26,6 +26,7 @@ jobs:
         with:
           version: latest
 
+      # Optional: PAT auth (not required when we pass --password for link/DB ops)
       - name: Auth (optional PAT)
         shell: bash
         env:
@@ -39,6 +40,7 @@ jobs:
             echo "No SUPABASE_ACCESS_TOKEN provided; continuing without PAT."
           fi
 
+      # Link using DB password; this sets the project context for subsequent commands
       - name: Link project (DB password; non-interactive)
         shell: bash
         env:
@@ -58,59 +60,47 @@ jobs:
             --password    "${SUPABASE_DB_PASSWORD}" \
             --workdir     .
 
+      # (Optional) show link info; include password so it never prompts
       - name: Link status (diag)
         shell: bash
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-          supabase link status \
-            --project-ref "${SUPABASE_PROJECT_REF}" \
-            --password    "${SUPABASE_DB_PASSWORD}" \
-            --workdir     .
+          supabase link status --workdir . --password "${SUPABASE_DB_PASSWORD}"
 
+      # ✅ Apply migrations — NO --project-ref here
       - name: DB push (migrations)
         shell: bash
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-          supabase db push \
-            --project-ref "${SUPABASE_PROJECT_REF}" \
-            --password    "${SUPABASE_DB_PASSWORD}" \
-            --workdir     .
+          supabase db push --workdir . --password "${SUPABASE_DB_PASSWORD}"
 
+      # ✅ Seed — also NO --project-ref
       - name: Seed (optional)
         shell: bash
         env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           if [[ -f supabase/seed/seed.sql ]]; then
             echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-            cat supabase/seed/seed.sql | supabase db query \
-              --project-ref "${SUPABASE_PROJECT_REF}" \
-              --password    "${SUPABASE_DB_PASSWORD}" \
-              --workdir     .
+            cat supabase/seed/seed.sql | supabase db query --workdir . --password "${SUPABASE_DB_PASSWORD}"
           else
             echo "No seed file found; skipping."
           fi
 
+      # Functions deploy can use the linked context
       - name: Deploy Edge Functions
         shell: bash
-        env:
-          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -euo pipefail
           if [[ -d supabase/functions/hello-world ]]; then
-            supabase functions deploy hello-world \
-              --project-ref "${SUPABASE_PROJECT_REF}" \
-              --workdir     .
+            supabase functions deploy hello-world --workdir .
           else
             echo "No edge functions to deploy; skipping."
           fi
