@@ -26,7 +26,6 @@ jobs:
         with:
           version: latest
 
-      # Optional PAT auth (useful but not required when we pass --password)
       - name: Auth (optional PAT)
         shell: bash
         env:
@@ -40,7 +39,6 @@ jobs:
             echo "No SUPABASE_ACCESS_TOKEN provided; continuing without PAT."
           fi
 
-      # Link using DB password; also safe to re-run (idempotent)
       - name: Link project (DB password; non-interactive)
         shell: bash
         env:
@@ -60,16 +58,19 @@ jobs:
             --password    "${SUPABASE_DB_PASSWORD}" \
             --workdir     .
 
-      # Explicit status with project ref
       - name: Link status (diag)
         shell: bash
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
-          supabase link status --project-ref "${SUPABASE_PROJECT_REF}" --workdir .
+          echo "::add-mask::${SUPABASE_DB_PASSWORD}"
+          supabase link status \
+            --project-ref "${SUPABASE_PROJECT_REF}" \
+            --password    "${SUPABASE_DB_PASSWORD}" \
+            --workdir     .
 
-      # Apply migrations (pass ref + password explicitly)
       - name: DB push (migrations)
         shell: bash
         env:
@@ -83,7 +84,6 @@ jobs:
             --password    "${SUPABASE_DB_PASSWORD}" \
             --workdir     .
 
-      # Optional seed; use stdin; pass ref + password explicitly
       - name: Seed (optional)
         shell: bash
         env:
@@ -101,7 +101,6 @@ jobs:
             echo "No seed file found; skipping."
           fi
 
-      # Deploy Edge Functions (pass ref explicitly)
       - name: Deploy Edge Functions
         shell: bash
         env:
