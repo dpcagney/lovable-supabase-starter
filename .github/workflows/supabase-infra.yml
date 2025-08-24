@@ -25,28 +25,33 @@ jobs:
         with:
           version: latest
 
-      # Optional: PAT login (not required for --password link, but harmless)
+      # Optional: PAT auth (guarded in bash, no "if: ${{ secrets... }}")
       - name: Auth (optional PAT)
-        if: ${{ secrets.SUPABASE_ACCESS_TOKEN != '' }}
+        shell: bash
         env:
           SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
         run: |
-          echo "::add-mask::${SUPABASE_ACCESS_TOKEN}"
-          supabase login --token "${SUPABASE_ACCESS_TOKEN}"
+          set -euo pipefail
+          if [[ -n "${SUPABASE_ACCESS_TOKEN:-}" ]]; then
+            echo "::add-mask::${SUPABASE_ACCESS_TOKEN}"
+            supabase login --token "${SUPABASE_ACCESS_TOKEN}"
+          else
+            echo "No SUPABASE_ACCESS_TOKEN provided; continuing without PAT."
+          fi
 
-      # 👉 Link using DB password so there is NO interactive prompt
+      # Link using DB password so it's fully non-interactive
       - name: Link project (DB password; non-interactive)
+        shell: bash
         env:
           SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
-        shell: bash
         run: |
           set -euo pipefail
           if [[ -z "${SUPABASE_PROJECT_REF:-}" ]]; then
-            echo "::error::SUPABASE_PROJECT_REF is empty."; exit 1
+            echo "::error::SUPABASE_PROJECT_REF is empty"; exit 1
           fi
           if [[ -z "${SUPABASE_DB_PASSWORD:-}" ]]; then
-            echo "::error::SUPABASE_DB_PASSWORD is empty."; exit 1
+            echo "::error::SUPABASE_DB_PASSWORD is empty"; exit 1
           fi
           echo "::add-mask::${SUPABASE_DB_PASSWORD}"
           supabase link \
