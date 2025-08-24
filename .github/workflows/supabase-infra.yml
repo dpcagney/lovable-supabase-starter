@@ -18,10 +18,10 @@ jobs:
         with:
           deno-version: v1.x
 
-      - name: Install Supabase CLI
-        run: |
-          curl -sL https://supabase.io/cli/install | sh
-          echo "$HOME/.supabase/bin" >> $GITHUB_PATH
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Link project (requires SUPABASE_ACCESS_TOKEN & project ref in config.toml)
         env:
