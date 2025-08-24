@@ -75,8 +75,8 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-          cat supabase/seed/seed.sql | supabase db query --workdir . --password "${SUPABASE_DB_PASSWORD}"
+          # No --password for 'db query'; it uses the linked project context
+          cat supabase/seed/seed.sql | supabase db query --workdir .
 
       # ✅ Deploy Edge Functions — uses the link context
       - name: Deploy Edge Functions
