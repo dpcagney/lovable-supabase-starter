@@ -11,6 +11,7 @@ jobs:
   supabase:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,7 +26,7 @@ jobs:
         with:
           version: latest
 
-      # Optional PAT auth (not required when using --password everywhere)
+      # Optional PAT auth (useful but not required when we pass --password)
       - name: Auth (optional PAT)
         shell: bash
         env:
@@ -39,7 +40,7 @@ jobs:
             echo "No SUPABASE_ACCESS_TOKEN provided; continuing without PAT."
           fi
 
-      # Link using DB password so it’s fully non-interactive; pin workdir to repo root
+      # Link using DB password; also safe to re-run (idempotent)
       - name: Link project (DB password; non-interactive)
         shell: bash
         env:
@@ -59,41 +60,58 @@ jobs:
             --password    "${SUPABASE_DB_PASSWORD}" \
             --workdir     .
 
-      # Quick diag so we can see link info and fail early if not linked
+      # Explicit status with project ref
       - name: Link status (diag)
-        run: supabase link status --workdir .
+        shell: bash
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+        run: |
+          set -euo pipefail
+          supabase link status --project-ref "${SUPABASE_PROJECT_REF}" --workdir .
 
-      # Apply migrations (pass password explicitly to avoid any prompt)
+      # Apply migrations (pass ref + password explicitly)
       - name: DB push (migrations)
         shell: bash
         env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-          supabase db push --workdir . --password "${SUPABASE_DB_PASSWORD}"
+          supabase db push \
+            --project-ref "${SUPABASE_PROJECT_REF}" \
+            --password    "${SUPABASE_DB_PASSWORD}" \
+            --workdir     .
 
-      # Optional seed; use stdin and pass password explicitly
+      # Optional seed; use stdin; pass ref + password explicitly
       - name: Seed (optional)
         shell: bash
         env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           if [[ -f supabase/seed/seed.sql ]]; then
             echo "::add-mask::${SUPABASE_DB_PASSWORD}"
-            cat supabase/seed/seed.sql | supabase db query --workdir . --password "${SUPABASE_DB_PASSWORD}"
+            cat supabase/seed/seed.sql | supabase db query \
+              --project-ref "${SUPABASE_PROJECT_REF}" \
+              --password    "${SUPABASE_DB_PASSWORD}" \
+              --workdir     .
           else
             echo "No seed file found; skipping."
           fi
 
-      # Deploy Edge Functions
+      # Deploy Edge Functions (pass ref explicitly)
       - name: Deploy Edge Functions
         shell: bash
+        env:
+          SUPABASE_PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
         run: |
           set -euo pipefail
           if [[ -d supabase/functions/hello-world ]]; then
-            supabase functions deploy hello-world --workdir .
+            supabase functions deploy hello-world \
+              --project-ref "${SUPABASE_PROJECT_REF}" \
+              --workdir     .
           else
             echo "No edge functions to deploy; skipping."
           fi
