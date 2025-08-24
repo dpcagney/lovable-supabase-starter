@@ -29,3 +29,5 @@ supabase functions deploy hello-world
 
 - `.github/workflows/ci.yml` builds the web app.
 - `.github/workflows/supabase-infra.yml` applies migrations and deploys edge functions.
+
+## UPDATE
