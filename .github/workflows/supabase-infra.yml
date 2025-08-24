@@ -25,7 +25,7 @@ jobs:
         with:
           version: latest
 
-      # Optional: PAT auth (guarded in bash, no "if: ${{ secrets... }}")
+      # Optional PAT auth (not required when using --password everywhere)
       - name: Auth (optional PAT)
         shell: bash
         env:
@@ -39,7 +39,7 @@ jobs:
             echo "No SUPABASE_ACCESS_TOKEN provided; continuing without PAT."
           fi
 
-      # Link using DB password so it's fully non-interactive
+      # Link using DB password so it’s fully non-interactive; pin workdir to repo root
       - name: Link project (DB password; non-interactive)
         shell: bash
         env:
@@ -56,28 +56,44 @@ jobs:
           echo "::add-mask::${SUPABASE_DB_PASSWORD}"
           supabase link \
             --project-ref "${SUPABASE_PROJECT_REF}" \
-            --password    "${SUPABASE_DB_PASSWORD}"
+            --password    "${SUPABASE_DB_PASSWORD}" \
+            --workdir     .
 
+      # Quick diag so we can see link info and fail early if not linked
+      - name: Link status (diag)
+        run: supabase link status --workdir .
+
+      # Apply migrations (pass password explicitly to avoid any prompt)
       - name: DB push (migrations)
-        run: supabase db push
+        shell: bash
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
+        run: |
+          set -euo pipefail
+          echo "::add-mask::${SUPABASE_DB_PASSWORD}"
+          supabase db push --workdir . --password "${SUPABASE_DB_PASSWORD}"
 
+      # Optional seed; use stdin and pass password explicitly
       - name: Seed (optional)
         shell: bash
+        env:
+          SUPABASE_DB_PASSWORD: ${{ secrets.SUPABASE_DB_PASSWORD }}
         run: |
           set -euo pipefail
           if [[ -f supabase/seed/seed.sql ]]; then
-            # stdin form works across CLI versions
-            cat supabase/seed/seed.sql | supabase db query
+            echo "::add-mask::${SUPABASE_DB_PASSWORD}"
+            cat supabase/seed/seed.sql | supabase db query --workdir . --password "${SUPABASE_DB_PASSWORD}"
           else
             echo "No seed file found; skipping."
           fi
 
+      # Deploy Edge Functions
       - name: Deploy Edge Functions
         shell: bash
         run: |
           set -euo pipefail
           if [[ -d supabase/functions/hello-world ]]; then
-            supabase functions deploy hello-world
+            supabase functions deploy hello-world --workdir .
           else
             echo "No edge functions to deploy; skipping."
           fi
